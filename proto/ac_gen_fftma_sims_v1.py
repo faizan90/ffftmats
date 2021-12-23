@@ -15,7 +15,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
 import matplotlib.pyplot as plt; plt.ioff()
 
 from aa_sampled_covariance_ftn import get_ft_corr_ftn
@@ -47,9 +46,9 @@ def main():
 
     col = '420'
 
-    n_sims = 300
+    n_sims = 100
 
-    out_dir = Path(r'fftma_v1_sims_07_daily')
+    out_dir = Path(r'fftma_v1_sims_09')
     #==========================================================================
 
     out_dir.mkdir(exist_ok=True)
@@ -68,8 +67,8 @@ def main():
     if (in_data_ser.shape[0] % 2):
         in_data_ser = in_data_ser.iloc[:-1]
 
-    in_data_ser[:] = norm.ppf(
-        in_data_ser.rank() / (in_data_ser.shape[0] + 1.0))
+    # in_data_ser[:] = norm.ppf(
+    #     in_data_ser.rank() / (in_data_ser.shape[0] + 1.0))
 
     if True:
         corr_ftn = get_ft_corr_ftn(in_data_ser.values)

@@ -43,7 +43,7 @@ def main():
     main_dir = Path(
         r'P:\Synchronize\IWS\Testings\fourtrans_practice\fftma')
 
-    main_dir /= r'fftma_sa_v3_07'
+    main_dir /= r'fftma_sa_v2_v1_04_hourly'
 
     os.chdir(main_dir)
 
@@ -61,10 +61,11 @@ def main():
 
     sep = ';'
 
-    # if True:
-    if False:
+    if True:
+    # if False:
         patt_ref = 'ref'
-        patt_sim = 'sim_calib_*'
+        # patt_sim = 'sim_calib_*'
+        patt_sim = 'sim*'
 
         out_fig_name_pecop = 'ecop_props.png'
         out_fig_name_pwr = 'cumm_pwr.png'
@@ -312,6 +313,7 @@ def main():
             ref_pwr = pwr[-1]
 
         pwr /= ref_pwr
+        # pwr /= pwr[-1]
 
         periods = (pwr.size * 2) / (
             np.arange(1, pwr.size + 1))

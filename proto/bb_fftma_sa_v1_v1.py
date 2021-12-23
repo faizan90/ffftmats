@@ -40,9 +40,9 @@ from aa_sampled_covariance_ftn import roll_real_2arrs
 
 from aa_sampled_covariance_ftn import get_rft_corr_ftn
 from ab_fftma_v1 import get_rfft_ma_deviates
-from ad_fftma_reverse_white_noise import get_rfft_ma_white_noise
+from ad_fftma_reverse_white_noise_v1 import get_rfft_ma_white_noise
 
-DEBUG_FLAG = True
+DEBUG_FLAG = False
 
 
 def get_props(
@@ -165,7 +165,8 @@ def obj_ftn(
 def run_sa(args):
 
     (n_iters,
-     n_vals,
+     corr_ftn,
+     in_data_ser_orig_srtd,
      lag_steps,
      ecop_dens_arrs,
      etpy_min,
@@ -189,12 +190,18 @@ def run_sa(args):
     temp = temp_init
     for i in range(n_iters):
         if not i:
-            norms = noise_dist_ftn(np.random.random(size=n_vals))
+            norms = noise_dist_ftn(np.random.random(size=corr_ftn.shape[0]))
 
             norms_iter = norms.copy()
 
         else:
             norms_iter = norms.copy()
+
+            # idx_rnd = np.random.randint(norms_iter.shape[0])
+            #
+            # prob_rnd = np.random.random()
+            #
+            # norms_iter[idx_rnd] = noise_dist_ftn(prob_rnd)
 
             idx_rnd_1 = np.random.randint(norms_iter.shape[0])
             idx_rnd_2 = np.random.randint(norms_iter.shape[0])
@@ -209,7 +216,7 @@ def run_sa(args):
             norms_iter[idx_rnd_1] = norm_2
             norms_iter[idx_rnd_2] = norm_1
 
-        sim = norms_iter.copy()
+        sim = get_fftma_sim(norms_iter, corr_ftn, in_data_ser_orig_srtd)
 
         sim_props = get_props(
             sim,
@@ -314,8 +321,6 @@ def get_n_cpus():
 
 def main():
 
-    # Simulate noise coorectly instead of time series.
-
     main_dir = Path(r'P:\Synchronize\IWS\Testings\fourtrans_practice\fftma')
     os.chdir(main_dir)
 
@@ -340,12 +345,12 @@ def main():
     lag_steps = np.arange(1, 40, dtype=np.int64)
     ecop_bins = 20
 
-    n_iters = int(1e5)
+    n_iters = int(1e1)
 
     break_opt_iters = 5000
 
     # temp_inits = [0.01, 0.05, 0.1]  # When variance and skew of asymms is not considered.
-    temp_inits = [5e-3, 1e-2, 1e-1, 1e1, 1e2]  # When variance and skew of asymms is considered.
+    temp_inits = [1e-3, 1e-2, 1e-1, 1e1, 1e2]  # When variance and skew of asymms is considered.
     temp_updt_iters = 100
     temp_red_rate = 0.99
     temp_init_iters = 200
@@ -354,7 +359,8 @@ def main():
 
     n_cpus = 'auto'
 
-    out_dir = Path(r'fftma_sa_v3_07')
+    # out_dir = Path(r'fftma_asymms_sim_11_daily_mean_var_skew_swap')
+    out_dir = Path(r'fftma_sa_v1_01')
     #==========================================================================
 
     out_dir.mkdir(exist_ok=True)
@@ -384,28 +390,25 @@ def main():
 
     corr_ftn = get_rft_corr_ftn(in_data_ser.values)
 
-    # if in_data_ser.shape[0] > corr_ftn.shape[0]:
-    #     in_data_ser = in_data_ser.iloc[:corr_ftn.shape[0]]
-    #     in_data_ser_orig = in_data_ser_orig.iloc[:corr_ftn.shape[0]]
-    #
-    # elif in_data_ser.shape[0] < corr_ftn.shape[0]:
-    #     corr_ftn = corr_ftn[:in_data_ser.shape[0]]
-    #
-    # assert corr_ftn.size == in_data_ser.size
+    if in_data_ser.shape[0] > corr_ftn.shape[0]:
+        in_data_ser = in_data_ser.iloc[:corr_ftn.shape[0]]
+        in_data_ser_orig = in_data_ser_orig.iloc[:corr_ftn.shape[0]]
+
+    elif in_data_ser.shape[0] < corr_ftn.shape[0]:
+        corr_ftn = corr_ftn[:in_data_ser.shape[0]]
+
+    assert corr_ftn.size == in_data_ser.size
 
     norms_white_noise = get_rfft_ma_white_noise(in_data_ser.values, corr_ftn)
 
-    norms_white_noise_orig_srtd = np.sort(norms_white_noise)
-
-    # NOTE: Could just shuffle the noise.
     norms_white_noise_dist_ftn = interp1d(
-        rankdata(norms_white_noise_orig_srtd) / (
-            norms_white_noise_orig_srtd.size + 1.0),
-        norms_white_noise_orig_srtd,
+        np.sort(rankdata(norms_white_noise) / (norms_white_noise.size + 1.0)),
+        np.sort(norms_white_noise),
         bounds_error=False,
-        fill_value=(
-            norms_white_noise_orig_srtd.min(),
-            norms_white_noise_orig_srtd.max()))
+        fill_value=(norms_white_noise.min(), norms_white_noise.max()))
+
+    # mean = norms_white_noise.mean()
+    # std = norms_white_noise.std()
 
     etpy_min = get_etpy_min(ecop_bins)
     etpy_max = get_etpy_max(ecop_bins)
@@ -414,7 +417,7 @@ def main():
 
     # Optimization start.
     ref_props = get_props(
-        norms_white_noise,
+        in_data_ser_orig.values,
         lag_steps,
         ecop_dens_arrs,
         etpy_min,
@@ -438,7 +441,8 @@ def main():
 
         args = (
             temp_init_iters,
-            norms_white_noise.size,
+            corr_ftn,
+            in_data_ser_orig_srtd,
             lag_steps,
             ecop_dens_arrs,
             etpy_min,
@@ -476,6 +480,7 @@ def main():
         # winsound.PlaySound('SystemExclamation', winsound.SND_ALIAS)
         winsound.PlaySound('SystemHand', winsound.SND_ALIAS)
         winsound.PlaySound('SystemHand', winsound.SND_ALIAS)
+        winsound.PlaySound('SystemHand', winsound.SND_ALIAS)
         # winsound.PlaySound('SystemExit', winsound.SND_ALIAS)
         raise RuntimeError
 
@@ -494,7 +499,8 @@ def main():
 
     args_gen = ((
         n_iters,
-        norms_white_noise.size,
+        corr_ftn,
+        in_data_ser_orig_srtd,
         lag_steps,
         ecop_dens_arrs,
         etpy_min,
@@ -510,9 +516,6 @@ def main():
         norms_white_noise_dist_ftn) for sim_no in range(n_sims))
 
     ress = list(mp_pool.imap_unordered(run_sa, args_gen))
-
-    mp_pool.close()
-    mp_pool.join()
 
     for i, res in enumerate(ress):
         (sim_calib,
@@ -531,13 +534,13 @@ def main():
         print('not_acpt_iters:', not_acpt_iters)
         print('obj_val_global:', obj_val_global)
         print('temp:', temp)
+        # Optimization end.
 
-        sims[f'sim_calib_{i}'] = get_fftma_sim(
-            sim_calib, corr_ftn, in_data_ser_orig_srtd)
-
+        sims[f'sim_calib_{i}'] = sim_calib
         sims[f'norms_calib_{i}'] = norms_calib
 
-    # Optimization end.
+    mp_pool.close()
+    mp_pool.join()
 
     pd.DataFrame(sims).to_csv(
         out_dir / 'sims.csv', sep=';', float_format='%0.6f')

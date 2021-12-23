@@ -58,11 +58,11 @@ def main():
     main_dir = Path(r'P:\Synchronize\IWS\Testings\fourtrans_practice\fftma')
     os.chdir(main_dir)
 
-    # in_data_file = Path(
-    #     r'neckar_norm_cop_infill_discharge_1961_2015_20190118.csv')
-
     in_data_file = Path(
-        r'fftma_sa_v3_06/sims.csv')
+        r'neckar_norm_cop_infill_discharge_1961_2015_20190118.csv')
+
+    # in_data_file = Path(
+    #     r'fftma_sa_v3_06/sims.csv')
 
     beg_time = '2000-01-01'
     end_time = '2001-12-30'
@@ -81,9 +81,9 @@ def main():
 
     sep = ';'
 
-    # col = '420'
+    col = '420'
     # col = 'ref'
-    col = 'norms_calib_1'
+    # col = 'norms_calib_1'
 
     out_dir = Path(r'fftma_sa_v3_06')
     #==========================================================================
@@ -101,8 +101,8 @@ def main():
 
     in_data_ser_orig_srtd = np.sort(in_data_ser_orig)
 
-    if (in_data_ser.shape[0] % 2):
-        in_data_ser = in_data_ser.iloc[:-1]
+    # if (in_data_ser.shape[0] % 2):
+    #     in_data_ser = in_data_ser.iloc[:-1]
 
     # in_data_ser[:] = norm.ppf(
     #     in_data_ser.rank() / (in_data_ser.shape[0] + 1.0))
@@ -207,9 +207,9 @@ def main():
     plt.xlabel('Time step')
     plt.ylabel('Signal')
 
-#     plt.xlabel('z')
-#     plt.ylabel('F(z)')
-#
+    # plt.xlabel('z')
+    # plt.ylabel('F(z)')
+
     plt.grid()
     plt.gca().set_axisbelow(True)
 #

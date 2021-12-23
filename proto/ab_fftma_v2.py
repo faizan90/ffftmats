@@ -15,10 +15,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+# from scipy.stats import norm
 import matplotlib.pyplot as plt; plt.ioff()
 
-from aa_sampled_covariance_ftn import get_ft_corr_ftn, get_rft_corr_ftn
+from aa_sampled_covariance_ftn import roll_real_2arrs
 
 DEBUG_FLAG = False
 
@@ -33,22 +33,7 @@ def sph_vg(h_arr, arg):
     return sph_vg
 
 
-def get_fft_ma_deviates(zs, corr_ftn):
-
-    norms_ft = np.fft.fft(zs)
-    corr_ftn_ft = np.fft.fft(corr_ftn)
-
-    norms_corr_ftn_mags_prod = norms_ft * (np.abs(corr_ftn_ft) ** 0.5)
-
-    norms_corr_ftn_mags_prod_inv = np.fft.ifft(norms_corr_ftn_mags_prod)
-
-    imag_vals_sum = (norms_corr_ftn_mags_prod_inv.imag ** 2).sum()
-    assert np.isclose(imag_vals_sum, 0.0), imag_vals_sum
-
-    return norms_corr_ftn_mags_prod_inv.real
-
-
-def get_rfft_ma_deviates(zs, corr_ftn_rft):
+def get_rfft_ma_deviates_padded(zs, corr_ftn_rft, corr_ftn_range):
 
     norms_ft = np.fft.rfft(zs)
     corr_ftn_ft = np.fft.rfft(corr_ftn_rft)
@@ -60,12 +45,78 @@ def get_rfft_ma_deviates(zs, corr_ftn_rft):
     imag_vals_sum = (norms_corr_ftn_mags_prod_inv.imag ** 2).sum()
     assert np.isclose(imag_vals_sum, 0.0), imag_vals_sum
 
-    return norms_corr_ftn_mags_prod_inv.real
+    return norms_corr_ftn_mags_prod_inv.real[corr_ftn_range:-corr_ftn_range]
+
+
+def get_lagged_corr_ftn(data):
+
+    assert not (data.shape[0] % 2), data.shape[0]
+
+    n_corrs = data.shape[0] // 2
+
+    corrs = [1.0]
+    for lag in range(1, n_corrs):
+        corr = np.corrcoef(*roll_real_2arrs(data, data, lag, False))[0, 1]
+
+        corrs.append(corr)
+
+    corrs = np.concatenate((corrs, corrs[::-1]))
+
+    assert corrs.size == data.shape[0]
+
+    return corrs
+
+
+def get_corr_ftn_range(corr_ftn):
+
+    assert (corr_ftn[0] == 1.0) and (corr_ftn[-1] == 1.0)
+
+    # idxs_below_zero = np.where(corr_ftn < 0)[0]
+    #
+    # corr_ftn_range = idxs_below_zero[0]
+
+    corr_ftn_range = corr_ftn.size // 2
+
+    return corr_ftn_range
+
+
+def pad_corr_ftn(corr_ftn, corr_ftn_range):
+
+    zeros_arr = np.zeros(corr_ftn.shape[0] + 1)
+
+    padded_corr_ftn = np.concatenate((
+        corr_ftn[:corr_ftn_range],
+        zeros_arr,
+        corr_ftn[-corr_ftn_range + 1:]))
+
+    assert padded_corr_ftn.size == (corr_ftn.size + (2 * corr_ftn_range))
+
+    return padded_corr_ftn
+
+# def pad_corr_ftn(corr_ftn, corr_ftn_range):
+#
+#     zeros_arr = np.zeros((corr_ftn_range * 2))
+#
+#     padded_corr_ftn = np.concatenate((
+#         corr_ftn[:(corr_ftn.size // 2)],
+#         zeros_arr,
+#         corr_ftn[(corr_ftn.size // 2):]))
+#
+#     assert padded_corr_ftn.size == (corr_ftn.size + (2 * corr_ftn_range))
+#
+#     return padded_corr_ftn
 
 
 def main():
 
+    '''
+    Instead of the FT rolled correlation function, we use the lagged one
+    and pad it with a length in the middle such that the final simulated
+    series has no correlation between the first and the last element.
+    '''
+
     main_dir = Path(r'P:\Synchronize\IWS\Testings\fourtrans_practice\fftma')
+
     os.chdir(main_dir)
 
     in_data_file = Path(
@@ -80,8 +131,12 @@ def main():
 
     time_fmt = '%Y-%m-%d'
 
-    idx_perturb = 100
+    # idx_perturb = 100
+
+    out_dir = Path(r'test_fftma_v2_02')
     #==========================================================================
+
+    out_dir.mkdir(exist_ok=True)
 
     in_data_df = pd.read_csv(in_data_file, sep=sep, index_col=0)
     in_data_df.index = pd.to_datetime(in_data_df.index, format=time_fmt)
@@ -91,43 +146,27 @@ def main():
     if (in_data_ser.shape[0] % 2):
         in_data_ser = in_data_ser.iloc[:-1]
 
-    in_data_ser[:] = norm.ppf(
-        in_data_ser.rank() / (in_data_ser.shape[0] + 1.0))
+    # in_data_ser[:] = norm.ppf(
+    #     in_data_ser.rank() / (in_data_ser.shape[0] + 1.0))
 
-    if True:
-        corr_ftn = get_ft_corr_ftn(in_data_ser.values)
-        corr_ftn_rft = get_rft_corr_ftn(in_data_ser.values)
+    corr_ftn = get_lagged_corr_ftn(in_data_ser.values)
 
-    else:
-        h_arr = np.arange(in_data_ser.shape[0] * 2)
+    corr_ftn_range = corr_ftn.size // 2  # get_corr_ftn_range(corr_ftn)
 
-        h_arr = np.concatenate((h_arr, h_arr[::-1][1:]))
-
-        corr_ftn = sph_vg(h_arr, [100, 1])
+    corr_ftn = pad_corr_ftn(corr_ftn, corr_ftn_range)
 
     norms_a = np.random.normal(
         loc=in_data_ser.mean(),
         scale=in_data_ser.std(),
         size=corr_ftn.shape[0])
 
-    norms_b = norms_a.copy()
+    norms_a_rfft_ma = get_rfft_ma_deviates_padded(
+        norms_a, corr_ftn, corr_ftn_range)
 
-    norms_b[idx_perturb] += -5
-
-    norms_a_rft = np.random.normal(
-        loc=in_data_ser.mean(),
-        scale=in_data_ser.std(),
-        size=corr_ftn_rft.shape[0])
-
-    norms_a_fft_ma = get_fft_ma_deviates(norms_a, corr_ftn)
-    norms_b_fft_ma = get_fft_ma_deviates(norms_b, corr_ftn)
-
-    norms_a_rfft_ma = get_fft_ma_deviates(norms_a_rft, corr_ftn_rft)
+    assert norms_a_rfft_ma.size == in_data_ser.shape[0]
 
     # Plot.
     plt.figure(figsize=(7, 5))
-    # plt.plot(norms_a_fft_ma, label='ref', alpha=0.75, ls='--', c='r', lw=3)
-    # plt.plot(norms_b_fft_ma, label='sim', alpha=0.75, ls='dotted', c='k', lw=2)
     plt.plot(norms_a_rfft_ma, label='ra', alpha=0.75)
     # plt.plot(in_data_ser.values, label='orig', alpha=0.75)
     # plt.plot(corr_ftn, label='corr_ftn', alpha=0.75)
@@ -141,10 +180,11 @@ def main():
     plt.grid()
     plt.gca().set_axisbelow(True)
 
-    # plt.savefig('example_fftma.png', bbox_inches='tight')
+    # plt.savefig(out_dir / 'example_fftma.png', bbox_inches='tight')
 
     plt.show()
 
+    plt.close()
     return
 
 

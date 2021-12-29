@@ -43,7 +43,7 @@ def main():
     main_dir = Path(
         r'P:\Synchronize\IWS\Testings\fourtrans_practice\fftma')
 
-    main_dir /= r'fftma_sa_v2_v1_04_hourly'
+    main_dir /= r'fftma_sa_v2_v2_03'
 
     os.chdir(main_dir)
 

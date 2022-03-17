@@ -87,15 +87,15 @@ def main():
 #==============================================================================
     # in_file_path = Path(r'precipitation_bw_1961_2015.csv')
     #
-    # sim_label = 'phd_sims__ppt__quad_phsrand_01'  # next:
+    # sim_label = ''  # next:
     #
-    # labels = ['P1162', 'P1197', 'P4259', 'P5229']
+    # labels = ['P1162', 'P1197', 'P4259'], 'P5229'
     # # labels = ['P1162']
     #
     # time_fmt = '%Y-%m-%d'
     #
-    # beg_time = '1990-01-01'
-    # end_time = '1990-12-31'
+    # beg_time = '1961-01-01'
+    # end_time = '2015-12-31'
 
 #==============================================================================
 #    Hourly ppt.
@@ -114,17 +114,19 @@ def main():
 #==============================================================================
 #    Daily discharge.
 #==============================================================================
-    in_file_path = Path(
-        r'neckar_norm_cop_infill_discharge_1961_2015_20190118.csv')
+    # in_file_path = Path(
+    #     r'neckar_norm_cop_infill_discharge_1961_2015_20190118.csv')
 
-    sim_label = 'test_fftmasa_31'  # next:
+    in_file_path = Path(r'neckar_q_data_combined_20180713.csv')
 
-    labels = ['420']  # , '3421', '427' , '3465', '3470'
+    sim_label = 'test_noise_09'  # next:
+
+    labels = ['420' , '427']  # , '3470']  # , '3421' , '3465'
 
     time_fmt = '%Y-%m-%d'
 
-    beg_time = '2000-01-01'
-    end_time = '2001-12-31'
+    beg_time = '1961-01-01'
+    end_time = '1963-12-31'
 
 #==============================================================================
 
@@ -208,20 +210,24 @@ def main():
     etpy_ms_ft_flag = True
     scorr_ms_flag = True
     etpy_ms_flag = True
+    match_data_ms_ft_flag = True
+    match_probs_ms_ft_flag = True
+    match_data_ms_pair_ft_flag = True
+    match_probs_ms_pair_ft_flag = True
 
-    # scorr_flag = False
+    scorr_flag = False
     asymm_type_1_flag = False
     asymm_type_2_flag = False
     ecop_dens_flag = False
     ecop_etpy_flag = False
     nth_order_diffs_flag = False
     cos_sin_dist_flag = False
-    # pcorr_flag = False
+    pcorr_flag = False
     asymm_type_1_ms_flag = False
     asymm_type_2_ms_flag = False
     ecop_dens_ms_flag = False
-    match_data_ft_flag = False
-    match_probs_ft_flag = False
+    # match_data_ft_flag = False
+    # match_probs_ft_flag = False
     asymm_type_1_ft_flag = False
     asymm_type_2_ft_flag = False
     nth_order_ft_flag = False
@@ -231,32 +237,40 @@ def main():
     etpy_ms_ft_flag = False
     scorr_ms_flag = False
     etpy_ms_flag = False
+    match_data_ms_ft_flag = False
+    match_probs_ms_ft_flag = False
+    match_data_ms_pair_ft_flag = False
+    match_probs_ms_pair_ft_flag = False
 
-    n_reals = 8  # A multiple of n_cpus.
+    n_reals = 4  # A multiple of n_cpus.
     outputs_dir = main_dir / sim_label
     n_cpus = 'auto'
 
-    lag_steps = np.arange(1, 6)
+    # transform_type = 'probs'
+    # transform_type = 'data'
+    transform_type = 'norm'
+
+    lag_steps = np.arange(1, 9)
     # lag_steps = np.concatenate((np.arange(1, 10), [16, 20, 25, 30]))
     ecop_bins = 20
     nth_ords = np.arange(1, 3)
 #     nth_ords = np.array([1, 5])
     lag_steps_vld = np.arange(1, 16)
-    nth_ords_vld = np.arange(1, 4)
+    nth_ords_vld = np.arange(1, 3)
 
     use_dists_in_obj_flag = True
-    # use_dists_in_obj_flag = False
+    use_dists_in_obj_flag = False
 
     use_dens_ftn_flag = True
     use_dens_ftn_flag = False
 
     ratio_per_dens_bin = 0.01
 
-    n_beg_idxs, n_end_idxs = 1, 10000
+    n_beg_idxs, n_end_idxs = 1, 500
     idxs_sample_type = 3
     idxs_number_reduction_rate = 0.999
     mult_idxs_flag = True
-#     mult_idxs_flag = False
+    mult_idxs_flag = False
 
     wts_flag = True
     # wts_flag = False
@@ -267,10 +281,10 @@ def main():
 
     weights = None
     auto_wts_set_flag = True
-    wts_n_iters = 500
+    wts_n_iters = 200
 
     lags_nths_wts_flag = True
-    # lags_nths_wts_flag = False
+    lags_nths_wts_flag = False
     lags_nths_exp = 2.5
     lags_nths_n_iters = 500
     lags_nths_cumm_wts_contrib = 0.9999
@@ -308,31 +322,33 @@ def main():
     # plt_osv_flag = False
     # plt_ss_flag = False
     # plt_ms_flag = False
-    # plt_qq_flag = False
+    plt_qq_flag = False
 
     max_sims_to_plot = 2
 
     if long_test_flag:
         initial_annealing_temperature = 0.0001
-        temperature_reduction_ratio = 0.99
-        update_at_every_iteration_no = 200
-        maximum_iterations = int(2e6)
+        temperature_reduction_ratio = 0.993
+        update_at_every_iteration_no = 100
+        maximum_iterations = int(1e6)
         maximum_without_change_iterations = int(maximum_iterations * 0.1)
         objective_tolerance = 1e-5
         objective_tolerance_iterations = 2000
-        stop_acpt_rate = 1e-5
+        stop_acpt_rate = 3e-4
         maximum_iterations_without_updating_best = int(
             maximum_iterations * 0.05)
 
-        temperature_lower_bound = 1e-1
+        temperature_lower_bound = 1e1
         temperature_upper_bound = 5e9
         n_iterations_per_attempt = int(update_at_every_iteration_no * 3)
-        acceptance_lower_bound = 0.65
-        acceptance_upper_bound = 0.8
-        target_acpt_rate = 0.75
+        acceptance_lower_bound = 0.35
+        acceptance_upper_bound = 0.45
+        target_acpt_rate = 0.40
         ramp_rate = 1.2
 
         acceptance_rate_iterations = 5000
+
+        acceptance_threshold_ratio = 1e-3
 
     else:
         initial_annealing_temperature = 0.0001
@@ -354,6 +370,8 @@ def main():
         ramp_rate = 1.2
 
         acceptance_rate_iterations = 50
+
+        acceptance_threshold_ratio = 1e-3
 
     if gen_rltzns_flag:
         if test_unit_peak_flag:
@@ -432,7 +450,12 @@ def main():
             ratio_per_dens_bin,
             etpy_ms_ft_flag,
             scorr_ms_flag,
-            etpy_ms_flag)
+            etpy_ms_flag,
+            match_data_ms_ft_flag,
+            match_probs_ms_ft_flag,
+            match_data_ms_pair_ft_flag,
+            match_probs_ms_pair_ft_flag,
+            )
 
         fftmasa_cls.set_annealing_settings(
             initial_annealing_temperature,
@@ -444,7 +467,8 @@ def main():
             objective_tolerance_iterations,
             acceptance_rate_iterations,
             stop_acpt_rate,
-            maximum_iterations_without_updating_best)
+            maximum_iterations_without_updating_best,
+            acceptance_threshold_ratio)
 
         if auto_init_temperature_flag:
             fftmasa_cls.set_annealing_auto_temperature_settings(
@@ -484,9 +508,11 @@ def main():
             fftmasa_cls.set_partial_cdf_calibration_settings(
                 lower_threshold, upper_threshold, inside_flag)
 
-        fftmasa_cls.set_misc_settings(n_reals, outputs_dir, n_cpus)
-
         fftmasa_cls.set_stop_criteria_labels(stop_criteria_labels)
+
+        fftmasa_cls.set_internal_data_transform_to_use_settings(transform_type)
+
+        fftmasa_cls.set_misc_settings(n_reals, outputs_dir, n_cpus)
 
         fftmasa_cls.update_h5_file_name(h5_name)
 

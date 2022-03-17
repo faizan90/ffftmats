@@ -12,6 +12,7 @@ from scipy.stats import rankdata
 
 from timeit import default_timer
 from multiprocessing import Pool
+from itertools import combinations
 
 import h5py
 import matplotlib.pyplot as plt;plt.ioff()
@@ -51,6 +52,141 @@ class FFTMASAPlot(
         self._plt_sett_noise = self._default_line_sett
         self._plt_sett_corr_ftn = self._default_line_sett
         self._plt_sett_noise_cdfs = self._plt_sett_gnrc_cdfs
+        self._plt_sett_cross_noise_sctr = self._plt_sett_ecops_sctr
+        return
+
+    @staticmethod
+    def _plot_noise_scatter_ms_base(args):
+
+        (data_a,
+         data_b,
+         fig_suff,
+         out_dir,
+         plt_sett,
+         dl_a,
+         dl_b) = args
+
+        axes = plt.subplots(1, 1, squeeze=False)[1]
+
+        row, col = 0, 0
+
+        axes[row, col].scatter(
+            data_a,
+            data_b,
+            alpha=plt_sett.alpha_1,
+            c='b')
+
+        axes[row, col].grid()
+
+        axes[row, col].set_axisbelow(True)
+
+        axes[row, col].set_aspect('equal')
+
+        axes[row, col].set_xlabel(f'Noise - {dl_a}')
+        axes[row, col].set_ylabel(f'Noise - {dl_b}')
+
+        min_crd = min([data_a.min(), data_b.min()]) * 0.95
+        max_crd = max([data_a.max(), data_b.max()]) * 1.05
+
+        axes[row, col].set_xlim(min_crd, max_crd)
+        axes[row, col].set_ylim(min_crd, max_crd)
+
+        pcorr = np.corrcoef(data_a, data_b)[0, 1]
+
+        scorr = np.corrcoef(
+            np.argsort(np.argsort(data_a)),
+            np.argsort(np.argsort(data_b)))[0, 1]
+
+        plt.suptitle(f'pcorr: {pcorr:+0.3f}, scorr: {scorr:+0.3f}')
+
+        plt.tight_layout()
+
+        plt.savefig(
+            str(out_dir / f'ms__cross_noise_scatter_{fig_suff}.png'),
+            bbox_inches='tight')
+
+        plt.close()
+        return
+
+    def _plot_noise_scatter_ms(self):
+
+        '''
+        Meant for pairs only.
+        '''
+
+        beg_tm = default_timer()
+
+        h5_hdl = h5py.File(self._plt_in_h5_file, mode='r', driver=None)
+
+        plt_sett = self._plt_sett_cross_noise_sctr
+
+        new_mpl_prms = plt_sett.prms_dict
+
+        old_mpl_prms = get_mpl_prms(new_mpl_prms.keys())
+
+        set_mpl_prms(new_mpl_prms)
+
+        data_labels = tuple(h5_hdl['data_ref'].attrs['data_ref_labels'])
+
+        data_label_idx_combs = combinations(enumerate(data_labels), 2)
+
+        loop_prod = data_label_idx_combs
+
+        sim_grp_main = h5_hdl['data_sim_rltzns']
+
+        for ((di_a, dl_a), (di_b, dl_b)) in loop_prod:
+
+            ref_noise_a = h5_hdl[f'data_ref_rltzn/data_tfm_noise'][:, di_a]
+
+            ref_noise_b = h5_hdl[f'data_ref_rltzn/data_tfm_noise'][:, di_b]
+
+            fig_suff = f'ref_{dl_a}_{dl_b}'
+
+            args = (
+                ref_noise_a,
+                ref_noise_b,
+                fig_suff,
+                self._ms_dir,
+                plt_sett,
+                dl_a,
+                dl_b)
+
+            self._plot_noise_scatter_ms_base(args)
+
+            plot_ctr = 0
+            for rltzn_lab in sim_grp_main:
+
+                sim_noise_a = sim_grp_main[f'{rltzn_lab}/noise'][:, di_a]
+                sim_noise_b = sim_grp_main[f'{rltzn_lab}/noise'][:, di_b]
+
+                fig_suff = f'sim_{dl_a}_{dl_b}_{rltzn_lab}'
+
+                args = (
+                    sim_noise_a,
+                    sim_noise_b,
+                    fig_suff,
+                    self._ms_dir,
+                    plt_sett,
+                    dl_a,
+                    dl_b)
+
+                self._plot_noise_scatter_ms_base(args)
+
+                plot_ctr += 1
+
+                if plot_ctr == self._plt_max_n_sim_plots:
+                    break
+
+        h5_hdl.close()
+
+        set_mpl_prms(old_mpl_prms)
+
+        end_tm = default_timer()
+
+        if self._vb:
+            print(
+                f'Plotting multi-site pairwise noise scatter '
+                f'took {end_tm - beg_tm:0.2f} seconds.')
         return
 
     def _plot_noise_cdfs(self):
@@ -142,6 +278,8 @@ class FFTMASAPlot(
             print(
                 f'Plotting single-site noise distribution function '
                 f'took {end_tm - beg_tm:0.2f} seconds.')
+            
+        return
 
     def _plot_corr_ftn(self):
 
@@ -386,9 +524,18 @@ class FFTMASAPlot(
 
         # Variables specific to FFTMASA.
         if self._plt_osv_flag:
-            ftns_args.extend([
-                (self._plot_noise_idxs_sclrs, []),
-                ])
+
+            h5_hdl = h5py.File(self._plt_in_h5_file, mode='r', driver=None)
+
+            mult_idx_flag = h5_hdl['flags'].attrs['sett_mult_idx_flag']
+
+            h5_hdl.close()
+
+            if mult_idx_flag:
+                ftns_args.append((self._plot_noise_idxs_sclrs, []))
+
+            # ftns_args.extend([
+            #     ])
 
         self._fill_ss_args_gnrc(ftns_args)
 
@@ -401,9 +548,21 @@ class FFTMASAPlot(
 
         self._fill_ms_args_gnrc(ftns_args)
 
+        if self._plt_ms_flag:
+            h5_hdl = h5py.File(self._plt_in_h5_file, mode='r', driver=None)
+
+            n_data_labels = h5_hdl['data_ref'].attrs['data_ref_n_labels']
+
+            h5_hdl.close()
+
+            if n_data_labels >= 2:
+                ftns_args.extend([
+                    (self._plot_noise_scatter_ms, []),
+                    ])
+
         self._fill_qq_args_gnrc(ftns_args)
 
-        assert ftns_args
+        assert ftns_args, 'Huh!'
 
         n_cpus = min(self._n_cpus, len(ftns_args))
 

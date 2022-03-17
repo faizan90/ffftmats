@@ -93,7 +93,7 @@ class FFTMASARealization(GTGAlgRealization):
             iter_wo_min_updt):
 
         c1 = self._sett_ann_max_iters >= 10000
-        c2 = not (iter_ctr % (0.1 * self._sett_ann_max_iters))
+        c2 = not (iter_ctr % (0.05 * self._sett_ann_max_iters))
 
         if (c1 and c2) or (iter_ctr == 1):
             with self._lock:
@@ -205,58 +205,61 @@ class FFTMASARealization(GTGAlgRealization):
 
         assert idxs_diff > 0, idxs_diff
 
-        if any([
-            self._alg_wts_lag_nth_search_flag,
-            self._alg_wts_label_search_flag,
-            self._alg_wts_obj_search_flag,
-            self._alg_ann_runn_auto_init_temp_search_flag,
-            ]):
-
-            # Full spectrum randomization during search.
-            # new_idxs = np.arange(1, self._rs.shape[0] - 1)
-
-            new_idxs = self._rr.noise_idxs
+        # if any([
+        #     self._alg_wts_lag_nth_search_flag,
+        #     self._alg_wts_label_search_flag,
+        #     self._alg_wts_obj_search_flag,
+        #     self._alg_ann_runn_auto_init_temp_search_flag,
+        #     ]):
+        #
+        #     if self._sett_mult_idx_flag:
+        #         # Full spectrum randomization during search.
+        #         new_idxs = self._rr.noise_idxs
+        #
+        #     else:
+        #         new_idxs = np.random.choice(
+        #             self._rr.noise_idxs, size=(1,), replace=False)
+        #
+        # else:
+        if self._sett_mult_idx_flag:
+            min_idxs_to_gen = self._sett_mult_idx_n_beg_idxs
+            max_idxs_to_gen = self._sett_mult_idx_n_end_idxs
 
         else:
-            if self._sett_mult_idx_flag:
-                min_idx_to_gen = self._sett_mult_idx_n_beg_idxs
-                max_idxs_to_gen = self._sett_mult_idx_n_end_idxs
+            min_idxs_to_gen = 1
+            max_idxs_to_gen = 2
 
-            else:
-                min_idx_to_gen = 1
-                max_idxs_to_gen = 2
+        # Inclusive.
+        min_idxs_to_gen = min([min_idxs_to_gen, idxs_diff])
 
-            # Inclusive.
-            min_idxs_to_gen = min([min_idx_to_gen, idxs_diff])
+        # Inclusive.
+        max_idxs_to_gen = min([max_idxs_to_gen, idxs_diff])
 
-            # Inclusive.
-            max_idxs_to_gen = min([max_idxs_to_gen, idxs_diff])
+        if np.isnan(idxs_sclr):
+            idxs_to_gen = np.random.randint(min_idxs_to_gen, max_idxs_to_gen)
 
-            if np.isnan(idxs_sclr):
-                idxs_to_gen = np.random.randint(
-                    min_idxs_to_gen, max_idxs_to_gen)
+        else:
+            idxs_to_gen = min_idxs_to_gen + (
+                int(round(idxs_sclr *
+                    (max_idxs_to_gen - min_idxs_to_gen))))
 
-            else:
-                idxs_to_gen = min_idxs_to_gen + (
-                    int(round(idxs_sclr *
-                        (max_idxs_to_gen - min_idxs_to_gen))))
+        assert min_idxs_to_gen >= 1, 'This shouldn\'t have happend!'
+        assert idxs_to_gen >= 1, 'This shouldn\'t have happend!'
 
-            assert min_idx_to_gen >= 1, 'This shouldn\'t have happend!'
-            assert idxs_to_gen >= 1, 'This shouldn\'t have happend!'
+        if min_idxs_to_gen == idxs_diff:
+            new_idxs = np.arange(1, min_idxs_to_gen + 1)
 
-            if min_idx_to_gen == idxs_diff:
-                new_idxs = np.arange(1, min_idxs_to_gen + 1)
+        else:
+            new_idxs = []
+            sample = self._rr.noise_idxs
 
-            else:
-                new_idxs = []
-                sample = self._rr.noise_idxs
-
-                new_idxs = np.random.choice(
-                    sample,
-                    idxs_to_gen,
-                    replace=False)
+            new_idxs = np.random.choice(
+                sample,
+                idxs_to_gen,
+                replace=False)
 
         assert np.all(0 <= new_idxs)
+
         assert np.all(
             new_idxs < (self._data_ref_shape[0] + (self._sett_padd_steps * 2))), (
                 (self._data_ref_shape[0] + (self._sett_padd_steps * 2)), new_idxs)
@@ -291,11 +294,11 @@ class FFTMASARealization(GTGAlgRealization):
 
         self._rs.noise[idxs,:] = noise
 
-        self._rs.data_tfm = self._get_fftma_ts(self._rs.noise)[
-            self._sett_padd_steps:
-            self._data_ref_shape[0] + self._sett_padd_steps]
+        self._rs.data_tfm = self._get_fftma_ts(self._rs.noise)
 
-        ft = np.fft.rfft(self._rs.data_tfm, axis=0)
+        ft = np.fft.rfft(self._rs.data_tfm[
+            self._sett_padd_steps:
+            self._data_ref_shape[0] + self._sett_padd_steps], axis=0)
 
         self._rs.ft = ft
         self._rs.phs_spec = np.angle(ft)
@@ -311,7 +314,9 @@ class FFTMASARealization(GTGAlgRealization):
 
     def _update_sim_no_prms(self):
 
-        data = np.fft.irfft(self._rs.ft, axis=0)
+        data = self._rs.data_tfm[
+            self._sett_padd_steps:
+            self._data_ref_shape[0] + self._sett_padd_steps]
 
         probs = self._get_probs(data, True)
 
@@ -323,6 +328,28 @@ class FFTMASARealization(GTGAlgRealization):
                 np.argsort(np.argsort(probs[:, i])), i]
 
         self._rs.probs = probs
+
+        if any([self._sett_obj_match_data_ft_flag,
+                self._sett_obj_match_data_ms_ft_flag,
+                self._sett_obj_match_data_ms_pair_ft_flag]):
+
+            self._rs.data_ft_coeffs = np.fft.rfft(self._rs.data, axis=0)
+            self._rs.data_ft_coeffs_mags = np.abs(self._rs.data_ft_coeffs)
+
+            if self._sett_obj_match_data_ms_pair_ft_flag:
+                self._rs.data_ft_coeffs_phss = np.angle(
+                    self._rs.data_ft_coeffs)
+
+        if any([self._sett_obj_match_probs_ft_flag,
+                self._sett_obj_match_probs_ms_ft_flag,
+                self._sett_obj_match_probs_ms_pair_ft_flag]):
+
+            self._rs.probs_ft_coeffs = np.fft.rfft(self._rs.probs, axis=0)
+            self._rs.probs_ft_coeffs_mags = np.abs(self._rs.probs_ft_coeffs)
+
+            if self._sett_obj_match_probs_ms_pair_ft_flag:
+                self._rs.probs_ft_coeffs_phss = np.angle(
+                    self._rs.probs_ft_coeffs)
 
         self._update_obj_vars('sim')
         return
@@ -442,13 +469,16 @@ class FFTMASARealization(GTGAlgRealization):
 
             old_new_diff = old_obj_val - new_obj_val
 
-            if old_new_diff > 0:
+            old_new_adj_diff = old_new_diff - (
+                self._sett_ann_acpt_thresh * old_obj_val)
+
+            if old_new_adj_diff > 0:
                 accept_flag = True
 
             else:
                 rand_p = np.random.random()
 
-                boltz_p = np.exp(old_new_diff / temp)
+                boltz_p = np.exp(old_new_adj_diff / temp)
 
                 if rand_p < boltz_p:
                     accept_flag = True
@@ -614,6 +644,9 @@ class FFTMASARealization(GTGAlgRealization):
 
             self._rs.acpt_rates_dfrntl = np.array(
                 acpt_rates_dfrntl, dtype=np.float64)
+
+            self._rr.ft_cumm_corr = self._get_cumm_ft_corr(
+                self._rr.ft, self._rr.ft)
 
             self._rs.ref_sim_ft_corr = self._get_cumm_ft_corr(
                 self._rr.ft, self._rs.ft).astype(np.float64)

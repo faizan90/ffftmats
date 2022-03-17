@@ -70,10 +70,10 @@ class FFTMASAMain(
         self._rs = FFTMASAPrepareRltznSim()  # Simulation.
 
         GTGPrepareBase.__init__(self)
-        FFTMASAPrepareTfms
-        GTGPrepareCDFS
-        GTGPrepareUpdate
-        FFTMASAPrepare
+        FFTMASAPrepareTfms.__init__(self)
+        GTGPrepareCDFS.__init__(self)
+        GTGPrepareUpdate.__init__(self)
+        FFTMASAPrepare.__init__(self)
         GTGAlgBase.__init__(self)
         GTGAlgObjective.__init__(self)
         GTGAlgIO.__init__(self)

@@ -26,7 +26,7 @@ class FFTMASASettings(GTGSettings):
         # array while computing the correlation instead of discarding the
         # beginning and end time steps to compute correlation for a given
         # shift in time.
-        self._sett_padd_steps = 500
+        self._sett_padd_steps = 0
 
         # Flags.
         self._sett_mult_idx_flag = False

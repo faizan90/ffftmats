@@ -56,7 +56,13 @@ def get_rfft_ma_white_noise_padded(data, corr_ftn_rft, corr_ftn_range):
     imag_vals_sum = (norms.imag ** 2).sum()
     assert np.abs(norms.imag).max() <= 1e-12, imag_vals_sum
 
-    return norms.real[corr_ftn_range:-corr_ftn_range]
+    if corr_ftn_range == 0:
+        res = norms.real
+
+    else:
+        norms.real[corr_ftn_range:-corr_ftn_range]
+
+    return res
 
 
 def pad_data(data, corr_ftn_range):

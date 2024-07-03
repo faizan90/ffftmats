@@ -1,9 +1,9 @@
 '''
 @author: Faizan-Uni-Stuttgart
 
-Dec 6, 2021
+Jul 27, 2022
 
-2:35:27 PM
+10:40:31 PM
 
 '''
 import os
@@ -16,6 +16,7 @@ from fnmatch import fnmatch
 
 import numpy as np
 import pandas as pd
+from scipy.stats import rankdata
 import matplotlib.pyplot as plt; plt.ioff()
 
 from fcopulas import (
@@ -28,7 +29,7 @@ from fcopulas import (
 
 from aa_sampled_covariance_ftn import roll_real_2arrs
 
-DEBUG_FLAG = True
+DEBUG_FLAG = False
 
 
 def set_mpl_prms(prms_dict):
@@ -41,15 +42,17 @@ def set_mpl_prms(prms_dict):
 def main():
 
     main_dir = Path(
-        r'P:\Synchronize\IWS\Testings\fourtrans_practice\fftma')
+        r'P:\Synchronize\IWS\Testings\fourtrans_practice\fftma_asymm')
 
-    main_dir /= r'fftma_sa_v2_v2_03'
+    main_dir /= r'test_theo_vgs_15'
 
     os.chdir(main_dir)
 
-    in_file = Path(r'sims.csv')
+    in_file = Path(rf'sims.csv')
+    # in_file = Path(rf'sims_asymm1.csv')
+    in_file = Path(rf'sims_asymm23.csv')
 
-    lag_steps = np.arange(1, 100, dtype=np.int64)
+    lag_steps = np.arange(1, 31, dtype=np.int64)
 
     ecop_bins = 20
 
@@ -61,21 +64,19 @@ def main():
 
     sep = ';'
 
-    if True:
-    # if False:
-        patt_ref = 'ref'
-        # patt_sim = 'sim_calib_*'
-        patt_sim = 'sim*'
+    patt_ref = 'sum'
+    # patt_ref = 'asymm1'
+    patt_ref = 'asymm23'
+    patt_sim = 'sim*'
 
-        out_fig_name_pecop = 'ecop_props.png'
-        out_fig_name_pwr = 'cumm_pwr.png'
+    ref_label = patt_ref
 
-    else:
-        patt_ref = 'norms_init'
-        patt_sim = 'norms_calib_*'
+    norm_pwr_flag = True
+    norm_pwr_flag = False
 
-        out_fig_name_pecop = 'ecop_props_norms.png'
-        out_fig_name_pwr = 'cumm_pwr_norms.png'
+    out_fig_name_pecop = f'ecop_props__{ref_label}.png'
+    out_fig_name_pwr = f'cumm_pwr__{ref_label}.png'
+    out_fig_name_pwr_ranks = f'cumm_pwr_ranks__{ref_label}.png'
     #==========================================================================
 
     set_mpl_prms(prms_dict)
@@ -109,7 +110,7 @@ def main():
         if fnmatch(in_df.columns[i], patt_ref):
             clr = clrs[0]
 
-            lab = 'ref'
+            lab = ref_label
 
             zorder = 2
 
@@ -262,6 +263,7 @@ def main():
     plt.close()
     #==========================================================================
 
+    # Marginals.
     ref_pwr = None
     leg_flag = True
     for i in range(in_df.shape[1]):
@@ -281,7 +283,7 @@ def main():
         if fnmatch(in_df.columns[i], patt_ref):
             clr = clrs[0]
 
-            lab = 'ref'
+            lab = ref_label
 
             zorder = 2
 
@@ -312,8 +314,9 @@ def main():
         if fnmatch(in_df.columns[i], patt_ref):
             ref_pwr = pwr[-1]
 
-        pwr /= ref_pwr
-        # pwr /= pwr[-1]
+        if (ref_pwr is not None) and norm_pwr_flag:
+            pwr /= ref_pwr
+            # pwr /= pwr[-1]
 
         periods = (pwr.size * 2) / (
             np.arange(1, pwr.size + 1))
@@ -340,6 +343,89 @@ def main():
     plt.xlim(plt.xlim()[::-1])
 
     plt.savefig(out_fig_name_pwr, bbox_inches='tight')
+    plt.close()
+    #==========================================================================
+
+    # CDF.
+    ref_pwr = None
+    leg_flag = True
+    for i in range(in_df.shape[1]):
+        data = rankdata(in_df.iloc[:, i].values)
+
+        # if i not in (0, 3, 5):
+        #     continue
+
+        if (fnmatch(in_df.columns[i], patt_ref) or
+            fnmatch(in_df.columns[i], patt_sim)):
+
+            pass
+
+        else:
+            continue
+
+        if fnmatch(in_df.columns[i], patt_ref):
+            clr = clrs[0]
+
+            lab = ref_label
+
+            zorder = 2
+
+            plt_alpha = 0.6
+            lw = 3.0
+
+        else:
+            clr = clrs[1]
+
+            if leg_flag and fnmatch(in_df.columns[i], patt_sim):
+                leg_flag = False
+                lab = 'sim'
+
+            else:
+                lab = None
+
+            plt_alpha = 0.35
+            lw = 2.0
+
+            zorder = 1
+
+        ft = np.fft.rfft(data)[1:]
+
+        pwr = np.abs(ft) ** 2
+
+        pwr = pwr.cumsum()
+
+        if fnmatch(in_df.columns[i], patt_ref):
+            ref_pwr = pwr[-1]
+
+        if (ref_pwr is not None) and norm_pwr_flag:
+            pwr /= ref_pwr
+            # pwr /= pwr[-1]
+
+        periods = (pwr.size * 2) / (
+            np.arange(1, pwr.size + 1))
+
+        assert periods.size == pwr.shape[0]
+
+        plt.semilogx(
+            periods,
+            pwr,
+            alpha=plt_alpha,
+            color=clr,
+            label=lab,
+            lw=lw,
+            zorder=zorder)
+
+    plt.legend()
+
+    plt.grid()
+    plt.gca().set_axisbelow(True)
+
+    plt.xlabel('Period')
+    plt.ylabel('Cummulative power (ranks)')
+
+    plt.xlim(plt.xlim()[::-1])
+
+    plt.savefig(out_fig_name_pwr_ranks, bbox_inches='tight')
     plt.close()
     return
 

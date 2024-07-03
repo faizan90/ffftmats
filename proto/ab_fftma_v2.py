@@ -45,7 +45,13 @@ def get_rfft_ma_deviates_padded(zs, corr_ftn_rft, corr_ftn_range):
     imag_vals_sum = (norms_corr_ftn_mags_prod_inv.imag ** 2).sum()
     assert np.isclose(imag_vals_sum, 0.0), imag_vals_sum
 
-    return norms_corr_ftn_mags_prod_inv.real[corr_ftn_range:-corr_ftn_range]
+    if corr_ftn_range == 0:
+        res = norms_corr_ftn_mags_prod_inv.real
+
+    else:
+        res = norms_corr_ftn_mags_prod_inv.real[corr_ftn_range:-corr_ftn_range]
+
+    return  res
 
 
 def get_lagged_corr_ftn(data):

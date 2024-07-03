@@ -275,13 +275,15 @@ def main():
     wts_flag = True
     # wts_flag = False
 
-#     weights = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.005], dtype=np.float64)
-#     auto_wts_set_flag = False
-#     wts_n_iters = None
+    # weights = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.005], dtype=np.float64)
+    # auto_wts_set_flag = False
+    # wts_n_iters = None
+    # obj_wts_exp = None
 
     weights = None
     auto_wts_set_flag = True
     wts_n_iters = 200
+    obj_wts_exp = 0.5
 
     lags_nths_wts_flag = True
     lags_nths_wts_flag = False
@@ -489,7 +491,7 @@ def main():
 
         if wts_flag:
             fftmasa_cls.set_objective_weights_settings(
-                weights, auto_wts_set_flag, wts_n_iters)
+                weights, auto_wts_set_flag, wts_n_iters, obj_wts_exp)
 
         if lags_nths_wts_flag:
             fftmasa_cls.set_lags_nths_weights_settings(
